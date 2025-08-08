@@ -1,6 +1,18 @@
 import { createMachine, assign } from "xstate";
 
-const winningLines = [
+type GameContext = {
+  board: (string | null)[];
+  player: string;
+  winner: string | null;
+  winningLine: number[] | null;
+  moves: number;
+};
+
+type PlayEvent = { type: "PLAY"; value: number };
+type ResetEvent = { type: "RESET" };
+type GameEvent = PlayEvent | ResetEvent;
+
+const winningLines: number[][] = [
   [0, 1, 2],
   [3, 4, 5],
   [6, 7, 8],
@@ -11,24 +23,18 @@ const winningLines = [
   [2, 4, 6],
 ];
 
-const initialContext = {
-  board: Array(9).fill(null), //initially empty
+const initialContext: GameContext = {
+  board: Array(9).fill(null),
   player: "🧊",
   winner: null,
   winningLine: null,
   moves: 0,
 };
 
-function checkWin(
-  board: undefined[]
-): false | string | number[] | number | any | unknown {
+function checkWin(board: (string | null)[]): false | [string, number[]] {
   for (let line of winningLines) {
-    const xWon = line.every((index) => {
-        return board[index] === "🌶️";
-      }),
-      oWon = line.every((index) => {
-        return board[index] === "🧊";
-      });
+    const xWon = line.every((index) => board[index] === "🌶️");
+    const oWon = line.every((index) => board[index] === "🧊");
 
     if (xWon) {
       return ["🌶️", line];
@@ -42,7 +48,7 @@ function checkWin(
   return false;
 }
 
-export const gameMachine = createMachine({
+export const gameMachine = createMachine<GameContext, GameEvent>({
   initial: "playing",
   context: initialContext,
   states: {
@@ -51,9 +57,9 @@ export const gameMachine = createMachine({
         {
           target: "winner",
           cond: (context) => !!checkWin(context.board),
-          actions: assign({
-            winner: (context) => checkWin(context.board)[0],
-            winningLine: (context) => checkWin(context.board)[1],
+          actions: assign<GameContext, GameEvent>({
+            winner: (context) => checkWin(context.board)![0],
+            winningLine: (context) => checkWin(context.board)![1],
           }),
         },
         {
@@ -64,7 +70,7 @@ export const gameMachine = createMachine({
       on: {
         PLAY: {
           target: "playing",
-          actions: assign({
+          actions: assign<GameContext, PlayEvent>({
             board: (context, e) => {
               const updatedBoard = [...context.board];
               updatedBoard[e.value] = context.player;
@@ -84,7 +90,7 @@ export const gameMachine = createMachine({
   on: {
     RESET: {
       target: "playing",
-      actions: assign(initialContext),
+      actions: assign<GameContext, ResetEvent>(initialContext),
     },
   },
 });
